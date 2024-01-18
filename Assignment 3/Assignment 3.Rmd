@@ -1,0 +1,174 @@
+---
+title: "Assignment 3"
+output: pdf_document
+date: "2022-09-19"
+---
+
+# Assignment 3
+
+## Question 1
+
+```{r}
+library(dplyr)
+WNBA = read.csv("WNBA_Stats_21.csv", sep = ",", header = TRUE)
+head(select(WNBA, contains("FG")))
+```
+
+### a.)
+
+```{r}
+count(filter(WNBA, FTM > 50, AST > 75))
+```
+
+There are 18 players with FTM \> 50 and AST \> 75.
+
+### b.)
+
+```{r}
+WNBA %>%
+  select(PLAYER, TEAM, FGM, TO, PTS) %>%
+  arrange(desc(PTS)) %>%
+  head(10)
+```
+
+Brittney Griner had the second highest points.
+
+### c.)
+
+```{r}
+WNBA = WNBA %>% mutate(FGP = (FGM / FGA) * 100)
+WNBA$FGP = round(WNBA$FGP, digits = 2)
+WNBA = WNBA %>% mutate(FTP = (FTM / FTA) * 100)
+WNBA$FTP = round(WNBA$FTP, digits = 2)
+head(WNBA)
+
+WNBA %>%
+  filter(PLAYER == "Tina Charles") %>%
+  select(FGP, FTP)
+```
+
+Tina Charles' FGP is 44.91%, and their FTP is 82.03%.
+
+### d.)
+
+```{r}
+WNBA %>%
+  group_by(TEAM) %>%
+  summarise(avg_REB = mean(REB, na.rm = TRUE), min_REB = min(REB, na.rm = TRUE), 
+            max_REB = max(REB, na.rm = TRUE)) %>%
+  arrange(desc(avg_REB))
+
+```
+
+Team MIN has the max REB with an REB of 312.
+
+### e.)
+
+```{r}
+WNBA = WNBA %>%
+  group_by(TEAM) %>%
+  mutate(FTP_fix = ifelse(is.na(FTP), FGP * mean(FTP, na.rm = TRUE), FTP))
+WNBA$FTP_fix = round(WNBA$FTP_fix, digits = 2)
+
+WNBA2 = WNBA %>%
+  group_by(TEAM) %>% 
+  mutate(FTP_fix = ifelse(is.na(FTP), mean(FTP, na.rm = TRUE), FTP))
+WNBA2$FTP_fix = round(WNBA2$FTP_fix, digits = 2)
+
+head(WNBA)
+head(WNBA2)
+```
+
+The first method assumes that FGP is not, unlike FTP, NaN. Additionally, both assumes that because the team average FTP is some number, it means that that player's FTP is the same number or that number multiplied by that player's FGP, when its possible that its either lower or higher. Moreover, in the multiplication method, the resulting value is exceedingly higher than the highest FTP, which would not make sense.
+
+I personally feel like imputing missing data via the average is the best way as it predicts or approximates, based on the average, what the FTP of a player in a team, is. However, if that doesn't work, then removing that player's name and data entries is also possible, as the team average's FTP is not affected either way by that player.
+
+## Question 2
+
+Before starting, the data from who.csv was tidied.
+
+```{r}
+library(tidyverse)
+who = read.csv("who.csv", sep = ",", header = TRUE)
+who5 = who %>%
+  pivot_longer(
+    cols = new_sp_m014:newrel_f65, 
+    names_to = "key", 
+    values_to = "cases", 
+    values_drop_na = TRUE
+  ) %>% 
+  mutate(
+    key = stringr::str_replace(key, "newrel", "new_rel")
+  ) %>%
+  separate(key, c("new", "type", "sexage")) %>% 
+  select(-new, -iso2, -iso3) %>% 
+  separate(sexage, c("sex", "age"), sep = 1)
+```
+
+### a.)
+
+> mutate(key = stringr::str_replace(key, "newrel", "new_rel")
+
+This line is required for the data to be properly tidied because without it, the "key" column containing the column names from the data set as variables, would be inconsistent as the variables have information split by an underscore.
+
+### b.)
+
+```{r}
+sum(is.na(who))
+```
+
+There are 329,428 entries that were removed as NA.
+
+### c.)
+
+An explicit missing value is a missing entry found in the data set of a column, while an implicit missing value is a missing entry or column entirely from the data set itself; the column or entry is not found in the data set at all.
+
+Implicit missing values include the 'Recency' column which should contain how recent the specific data set is, and since the current data is all 'new' cases, another implicit missing value is the data for 'old' cases. In other words, what's missing is the recency of the cases which would only be filled with 'new' or 'old', and the country, year, type, sex, age, and number of cases of entries regarded as 'old'.
+
+### d.)
+
+```{r}
+str(who5)
+```
+
+The 'sex' column entries should be capitalized instead of lower-cased, and the 'age' column entries should require a hyphen to better show the age range. Moreover, 'country' and 'year' would be better as a factor type, and 'sex' would be better as a Boolean type.
+
+### e.)
+
+```{r}
+who5$year = as.factor(who5$year)
+
+who6 = aggregate(who5$cases, by = list(group = who5$year), FUN = sum)
+
+ggplot(who6, aes(x = group, y = x)) +
+  geom_bar(stat="identity") +
+  labs(x = "Year", y = "Number of Cases", title = "Total Global Tuberculosis Cases by Year") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(who6, aes(x = group, y = x)) +
+  geom_point() +
+  labs(x = "Year", y = "Number of Cases", title = "Total Global Tuberculosis Cases by Year") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The graph shows the total recorded number of global cases of Tuberculosis sorted by year. It shows that the number of cases skyrockets between 1994 and 1995. But considering the amount of data removed as NA, especially between 1980 and 1994, it implies that the data is incomplete. This is more clearly shown in the two graphs, as in the bar graph, the data from 1980-1994 are very small in comparison to 1995-2013 and not even shown, while the scatter plot shows that data as practically 0. However, there is an exponential trend regardless of the missing data a trend curve could approximate the amount of cases between 1980 to 1994.
+
+### f.)
+
+```{r}
+schqtr = read.csv("SchQtr.csv")
+
+schqtr1 = schqtr %>%
+  pivot_longer(
+    cols = Qtr.1:Qtr.4,
+    names_to = "Quarter", 
+    values_to = "Student_Count", 
+    values_drop_na = TRUE
+  ) %>%
+  mutate(Quarter = stringr::str_replace(Quarter, "Qtr_2", "Qtr.2")) %>%
+  separate(Quarter, c("Interval_Type", "Interval_ID"))
+
+str(schqtr1)
+```
+
+The new data set has 48 rows.
